@@ -1,4 +1,4 @@
-package main
+package gopool
 
 import (
 	"sync"
@@ -179,7 +179,7 @@ func (p *WorkerPool) stop(wait bool) {
 		p.stopChan <- struct{}{}
 	})
 	if wait {
-		p.wg.Done()
+		p.wg.Wait()
 	}
 }
 func (p *WorkerPool) Stop() {
