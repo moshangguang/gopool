@@ -112,8 +112,8 @@ loop:
 				// 没有一个协程可以执行任务，则看看工作协程数是否小于最大协程数，如果小于的话则开启一个新的协程
 				if atomic.LoadInt32(p.workerCount) < p.maxWorkerCount {
 					p.wg.Add(1)
-					go p.worker(task, p.workerQueue, p.wg)
 					atomic.AddInt32(p.workerCount, 1)
+					go p.worker(task)
 				} else { //如果工作协程数>最大协程数，则将任务放进工作协程的通道
 					p.workerQueue <- task
 				}
@@ -138,6 +138,7 @@ loop:
 			timer.Reset(p.idleTimeout)
 		}
 	}
+	p.wg.Done()
 
 }
 func (p *WorkerPool) release() bool {
@@ -156,19 +157,19 @@ func (p *WorkerPool) release() bool {
 	}
 }
 
-func (p *WorkerPool) worker(task func(), workerQueue chan func(), wg *sync.WaitGroup) {
-	defer wg.Done()
+func (p *WorkerPool) worker(task func()) {
+	defer p.wg.Done()
 	defer atomic.AddInt32(p.workerCount, -1)
 	for task != nil {
 		task()
 		task = nil
 		select {
-		case task = <-workerQueue:
+		case task = <-p.workerQueue:
 		case <-time.After(p.idleTimeout):
 			if p.release() {
 				return
 			}
-			task = <-workerQueue
+			task = <-p.workerQueue
 		}
 	}
 
