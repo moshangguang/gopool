@@ -37,8 +37,9 @@ func New(options ...WorkerPoolOption) *WorkerPool {
 		}
 	}
 	pool.formatter()
-	go pool.dispatch()
-
+	ready := make(chan struct{})
+	go pool.dispatch(ready)
+	<-ready
 	return pool
 }
 func (p *WorkerPool) formatter() {
@@ -100,8 +101,11 @@ func (p *WorkerPool) SubmitWait(task func()) {
 	}
 	p.rejectHandler(task)
 }
-func (p *WorkerPool) dispatch() {
+func (p *WorkerPool) dispatch(ready chan<- struct{}) {
 	var task func()
+	p.wg.Add(1)
+	close(ready)
+	ready = nil
 loop:
 	for {
 		task = p.blockQueue.PopFrontWithTimeout(p.idleTimeout)
@@ -139,7 +143,7 @@ loop:
 		}
 	}
 	p.wg.Done()
-
+	p.wg.Wait()
 }
 func (p *WorkerPool) release() bool {
 	for {
@@ -188,4 +192,7 @@ func (p *WorkerPool) Stop() {
 }
 func (p *WorkerPool) StopWait() {
 	p.stop(true)
+}
+func (p *WorkerPool) WorkerCount() int32 {
+	return atomic.LoadInt32(p.workerCount)
 }
