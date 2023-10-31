@@ -1,6 +1,7 @@
 package gopool
 
 import (
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -101,7 +102,7 @@ func (p *WorkerPool) SubmitWait(task func()) {
 	}
 	p.rejectHandler(task)
 }
-func (p *WorkerPool) dispatch(ready chan<- struct{}) {
+func (p *WorkerPool) dispatch(ready chan struct{}) {
 	var task func()
 	p.wg.Add(1)
 	close(ready)
@@ -134,14 +135,17 @@ loop:
 			continue
 		}
 	}
+	start := time.Now()
 	timer := time.NewTimer(p.idleTimeout)
 	for atomic.LoadInt32(p.workerCount) != 0 {
 		select {
 		case p.workerQueue <- nil:
 		case <-timer.C:
+			log.Println("塞入空值失败")
 			timer.Reset(p.idleTimeout)
 		}
 	}
+	log.Printf("打印耗时:%dms", time.Since(start).Milliseconds())
 	p.wg.Done()
 	p.wg.Wait()
 }
