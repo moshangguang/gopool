@@ -1,7 +1,6 @@
 package gopool
 
 import (
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -135,25 +134,26 @@ loop:
 			continue
 		}
 	}
-	start := time.Now()
-	timer := time.NewTimer(p.idleTimeout)
-	for atomic.LoadInt32(p.workerCount) != 0 {
-		select {
-		case p.workerQueue <- nil:
-		case <-timer.C:
-			log.Println("塞入空值失败")
-			timer.Reset(p.idleTimeout)
+	idleTimeout := InitIdleTimeout
+	timer := time.NewTimer(idleTimeout)
+	if p.coreWorkerCount != 0 {
+		for atomic.LoadInt32(p.workerCount) != 0 {
+			select {
+			case p.workerQueue <- nil:
+			case <-timer.C:
+				idleTimeout += InitIdleTimeout
+				if idleTimeout > p.idleTimeout {
+					idleTimeout = p.idleTimeout
+				}
+				timer.Reset(p.idleTimeout)
+			}
 		}
 	}
-	log.Printf("打印耗时:%dms", time.Since(start).Milliseconds())
 	p.wg.Done()
 	p.wg.Wait()
 }
 func (p *WorkerPool) release() bool {
 	for {
-		if p.blockQueue.Size() == 0 && p.blockQueue.IsClose() {
-			return true
-		}
 		workerCount := atomic.LoadInt32(p.workerCount)
 		if workerCount <= p.coreWorkerCount {
 			return false

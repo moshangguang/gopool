@@ -8,4 +8,5 @@ const (
 	MaxIdleTimeout         = 5 * time.Second
 	DefaultQueueLen        = 1 << 7
 	QueueClose             = 1
+	InitIdleTimeout        = 100 * time.Millisecond
 )
